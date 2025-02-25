@@ -1,8 +1,21 @@
-# React + Vite
-
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+# A Reactjs + Vite project 
+- This project was to test the automation of a node application using docker and github workflows
+for more details see automation.yml in workflows folder
+- Its an web application which makes the button change position at random making it unclickable
+# Instalation/Running
+### Using Docker (recomended)
+```bash
+docker pull iswnischay/click-app
+```
+```bash
+docker run -p 5173:5173 -it iswnischay/click-app
+```
+### Runing it locally
+```bash
+git clone https://www.github.com/8sem/unclickable.git
+```
+```bash
+cd unclickable
+npm i
+npm run dev
+```
