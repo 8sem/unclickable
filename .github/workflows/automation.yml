@@ -59,7 +59,13 @@ jobs:
         run: |
           echo "${{ secrets.KUBECONFIG_DATA }}" > kubeconfig.yaml
           export KUBECONFIG=$(pwd)/kubeconfig.yaml
+          
+          # Modify the server endpoint to use ngrok tunnel
           sed -i "s|server: .*|server: ${{ env.NGROK_URL }}|" kubeconfig.yaml
+          
+          # Disable certificate verification for ngrok tunnel
+          kubectl config set-cluster minikube --server=${{ env.NGROK_URL }} --insecure-skip-tls-verify=true
+
 
       - name: Deploy to Minikube via ngrok
         run: |
