@@ -26,7 +26,8 @@ jobs:
       - name: Push Docker Image
         run: |
           docker push ${{ secrets.DOCKER_USERNAME }}/click-app:latest
-  deploy-to-minikube:
+          
+  deploy:
     needs: build-and-push  # Runs after build-and-push job
     runs-on: ubuntu-latest
     steps:
@@ -41,14 +42,11 @@ jobs:
           echo "${{ secrets.KUBECONFIG_DATA }}" > kubeconfig.yaml
           export KUBECONFIG=$(pwd)/kubeconfig.yaml
 
-          # Replace Kubernetes API server with ngrok URL
           sed -i "s|server: .*|server: ${{ secrets.NGROK_URL }}|" kubeconfig.yaml
 
       - name: Deploy to Minikube via ngrok
         run: |
           export KUBECONFIG=$(pwd)/kubeconfig.yaml
-          
-             
           kubectl create deployment click-app --image=${{ secrets.DOCKER_USERNAME }}/click-app:latest || \
           kubectl set image deployment/click-app click-app=${{ secrets.DOCKER_USERNAME }}/click-app:latest
           
