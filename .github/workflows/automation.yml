@@ -26,3 +26,34 @@ jobs:
       - name: Push Docker Image
         run: |
           docker push ${{ secrets.DOCKER_USERNAME }}/click-app:latest
+  deploy-to-minikube:
+    needs: build-and-push  # Runs after build-and-push job
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+      - name: Configure kubectl to Use ngrok Tunnel
+        run: |
+          echo "${{ secrets.KUBECONFIG_DATA }}" > kubeconfig.yaml
+          export KUBECONFIG=$(pwd)/kubeconfig.yaml
+
+          # Replace Kubernetes API server with ngrok URL
+          sed -i "s|server: .*|server: ${{ secrets.NGROK_URL }}|" kubeconfig.yaml
+
+      - name: Deploy to Minikube via ngrok
+        run: |
+          export KUBECONFIG=$(pwd)/kubeconfig.yaml
+          
+             
+          kubectl create deployment click-app --image=${{ secrets.DOCKER_USERNAME }}/click-app:latest || \
+          kubectl set image deployment/click-app click-app=${{ secrets.DOCKER_USERNAME }}/click-app:latest
+          
+         
+
+          kubectl expose deployment click-app --type=NodePort --port=5000
+          
+          kubectl get services
