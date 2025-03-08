@@ -51,7 +51,7 @@ jobs:
           curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
           echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
           sudo apt update && sudo apt install ngrok
-
+          
       - name: Start Minikube
         run: |
           # Ensure Minikube runs as a non-root user
@@ -62,11 +62,14 @@ jobs:
           minikube start --driver=docker --force
           minikube update-context
           kubectl cluster-info
-          
-          # Copy Minikube kubeconfig and certificates
-          mkdir -p ~/.kube && mkdir -p ~/.minikube
-          minikube kubectl -- config view --raw > ~/.kube/config
-          cp -r ~/.minikube $HOME/.minikube
+
+          # Copy Minikube certificates if they exist
+          if [ -d "$HOME/.minikube" ]; then
+            echo "Copying Minikube certificates..."
+            sudo cp -r ~/.minikube $HOME/.minikube-backup
+          else
+            echo "Minikube certificates not found, skipping copy."
+          fi
 
       - name: Start ngrok Tunnel
         run: |
@@ -86,16 +89,14 @@ jobs:
           export KUBECONFIG=$(pwd)/kubeconfig.yaml
           sed -i "s|server: .*|server: ${{ env.NGROK_URL }}|" kubeconfig.yaml
 
-
       - name: Verify Kubernetes Context
         run: |
           export KUBECONFIG=$(pwd)/kubeconfig.yaml
           
-          # Regenerate certificates if missing
+          # Restore certificates if missing
           if [ ! -f ~/.minikube/ca.crt ] || [ ! -f ~/.minikube/profiles/minikube/client.crt ] || [ ! -f ~/.minikube/profiles/minikube/client.key ]; then
-            echo "Missing certificates! Regenerating..."
-            minikube delete
-            minikube start --driver=docker --force
+            echo "Restoring missing certificates..."
+            sudo cp -r $HOME/.minikube-backup ~/.minikube
           fi
           
           kubectl config view
