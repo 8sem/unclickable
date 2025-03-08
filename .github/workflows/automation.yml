@@ -61,6 +61,12 @@ jobs:
           export KUBECONFIG=$(pwd)/kubeconfig.yaml
           sed -i "s|server: .*|server: ${{ env.NGROK_URL }}|" kubeconfig.yaml
 
+      - name: Ensure Minikube is Running
+        run: |
+          minikube start --driver=docker
+          kubectl cluster-info
+
+
       - name: Deploy to Minikube via ngrok
         run: |
           export KUBECONFIG=$(pwd)/kubeconfig.yaml
