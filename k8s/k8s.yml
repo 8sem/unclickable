@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: click-app
-          image: 8sem/click-app:latest  # Replace with your Docker Hub image
+          image: iswnischay/click-app:latest  # Replace with your Docker Hub image
           ports:
             - containerPort: 5173
 
