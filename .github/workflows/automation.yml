@@ -58,5 +58,5 @@ jobs:
         run: |
           minikube service list
 
-      - name: Get Minikube Service URL
+      - name: Get Minikube Service URL 
         run: minikube service click-app-service --url
