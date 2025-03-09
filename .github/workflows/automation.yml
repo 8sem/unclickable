@@ -1,83 +1,62 @@
-name: Deploy to Minikube
+name: CI/CD for Click-App
 
 on:
   push:
     branches:
-      - main  # Runs on push to the 'main' branch
+      - main  # Run on push to main branch
+  pull_request:
+    branches:
+      - main  # Run on PR to main branch
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build & Push Docker Image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/click-app:latest
+
+  deploy:
+    needs: build
+    runs-on: self-hosted  # Deploys on local machine with Minikube
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install kubectl, jq & ngrok
+      - name: Start Minikube
         run: |
-          # Install kubectl
-          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          chmod +x kubectl
-          sudo mv kubectl /usr/local/bin/
-          
-          # Install jq for JSON parsing
-          sudo apt update && sudo apt install -y jq
-
-          # Install ngrok
-          curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
-          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
-          sudo apt update && sudo apt install ngrok
-          
-      - name: Start ngrok tunnel for Minikube API
-        run: |
-          ngrok authtoken ${{ secrets.NGROK_AUTH_TOKEN }}
-          nohup ngrok http 8443 > ngrok.log 2>&1 &
-
-      - name: Wait for ngrok to be ready and Fetch URL
-        run: |
-          sleep 10
-          curl -s http://127.0.0.1:4040/api/tunnels > tunnels.json
-          export NGROK_URL=$(jq -r '.tunnels[0].public_url' tunnels.json)
-          echo "NGROK_URL=$NGROK_URL" >> $GITHUB_ENV
-
-      - name: Configure kubectl with ngrok Tunnel
-        run: |
-          echo "${{ secrets.KUBECONFIG_DATA }}" | base64 --decode > kubeconfig.yaml
-          export KUBECONFIG=$(pwd)/kubeconfig.yaml
-          
-          # Modify kubeconfig to use ngrok tunnel
-          sed -i "s|server: .*|server: ${{ env.NGROK_URL }}|" kubeconfig.yaml
-          
-          # Disable TLS verification
-          kubectl config set-cluster minikube --server=${{ env.NGROK_URL }} --insecure-skip-tls-verify=true
-          
-      - name: Debug Kubernetes API Server
-        run: |
-          export KUBECONFIG=$(pwd)/kubeconfig.yaml
-          kubectl cluster-info || echo "Cluster info failed, checking kubeconfig..."
-          kubectl config view
-
-      - name: Restart Minikube if Needed
-        run: |
-          sudo usermod -aG docker $USER
-          newgrp docker
-          minikube stop || true
           minikube start --driver=docker
           minikube status
 
-      - name: Deploy to Minikube via ngrok
+      - name: Pull Docker Image from Docker Hub
+        run: docker pull ${{ secrets.DOCKER_USERNAME }}/click-app:latest
+
+      - name: Deploy to Minikube using k8s.yml
         run: |
-          export KUBECONFIG=$(pwd)/kubeconfig.yaml
-          
-          # Verify kubeconfig is correctly configured
-          kubectl config view
-          
-          # Deploy application
-          kubectl create deployment click-app --image=${{ secrets.DOCKER_USERNAME }}/click-app:latest || \
-          kubectl set image deployment/click-app click-app=${{ secrets.DOCKER_USERNAME }}/click-app:latest
-          
-          kubectl expose deployment click-app --type=NodePort --port=5000
-          
-          kubectl get services
-          
-      - name: Show ngrok URL
-        run: echo "App is available at ${{ env.NGROK_URL }}"
+          kubectl apply -f k8s/k8s.yml
+          kubectl get pods
+
+      - name: Expose Click-App Service
+        run: |
+          minikube service list
+
+      - name: Get Minikube Service URL
+        run: minikube service click-app-service --url
